@@ -29,7 +29,7 @@ extern "C" {
 
 // T-Display Battery Voltage
 #define BAT_PIN_NUM_VOLT           4     // (ADC_UNIT_1, ADC_CHANNEL_3) -  LCD_BAT_VOLT
-#define NO_BAT_MILLIVOLTS          4600  // greater than 4600 no battery connected
+#define NO_BAT_MILLIVOLTS          4500  // greater than 4600 no battery connected
 #define BAT_CHARGE_MILLIVOLTS      4350  // greater than 4350 means charging
 // T-Display Buttons
 #define BTN_PIN_NUM_1              GPIO_NUM_0   // BOOT
@@ -69,7 +69,7 @@ extern "C" {
 
 
 // Supported alignment: 16, 32, 64.
-// A higher alignment can enables higher burst transfer size, thus a higher i80 bus throughput.
+// A higher alignment can enable higher burst transfer size, thus a higher i80 bus throughput.
 #define LCD_PSRAM_TRANS_ALIGN    64
 #define LCD_SRAM_TRANS_ALIGN     4
 
@@ -77,9 +77,8 @@ extern "C" {
 #define LVGL_BUFFER_SIZE        (((LCD_H_RES * LCD_V_RES) / 10) + LCD_H_RES)
 
 // LVGL Timer options
-#define LVGL_TICK_PERIOD_MS    10
-#define LVGL_TASK_MAX_DELAY_MS 500
-#define LVGL_TASK_MIN_DELAY_MS 1
+#define LVGL_TICK_PERIOD_MS    5
+#define LVGL_MAX_SLEEP_MS      (LVGL_TICK_PERIOD_MS * 2) // this affects how fast the screen is refreshed
 #define LVGL_TASK_STACK_SIZE   (4 * 1024)
 #define LVGL_TASK_PRIORITY     2
 
@@ -93,6 +92,10 @@ int get_battery_voltage();
 int get_battery_percentage();
 
 double volts_to_percentage(double volts);
+
+bool usb_power_voltage(int milliVolts);
+
+bool usb_power_connected();
 
 #ifdef __cplusplus
 } /*extern "C"*/

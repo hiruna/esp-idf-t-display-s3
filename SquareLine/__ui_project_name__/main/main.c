@@ -7,14 +7,9 @@
 
 #include "t_display_s3.h"
 #include "iot_button.h"
+#include "ui/ui.h"
 
-#if defined CONFIG_LV_USE_DEMO_BENCHMARK
-#include "lvgl/demos/benchmark/lv_demo_benchmark.h"
-#elif defined CONFIG_LV_USE_DEMO_STRESS
-#include "lvgl/demos/stress/lv_demo_stress.h"
-#endif
-
-#define TAG "ESP-IDF-T-Display-S3-Example"
+#define TAG "__UI_PROJECT_NAME__"
 
 // gpio nums of the buttons
 static gpio_num_t btn_gpio_nums[2] = {
@@ -30,35 +25,12 @@ bool btn_1_pressed = false;
 bool btn_2_pressed = false;
 
 // used for setup_test_ui() function
-char *power_icon = LV_SYMBOL_POWER;
-char *lbl_btn_1_value = "";
-char *lbl_btn_2_value = "";
 int battery_voltage;
 int battery_percentage;
 bool on_usb_power = false;
 int last_screen_brightness_step = 16;
 int screen_brightness_step = 16;
 int current_battery_symbol_idx = 0;
-char *battery_symbols[5] = {
-        LV_SYMBOL_BATTERY_EMPTY,
-        LV_SYMBOL_BATTERY_1,
-        LV_SYMBOL_BATTERY_2,
-        LV_SYMBOL_BATTERY_3,
-        LV_SYMBOL_BATTERY_FULL
-};
-
-// lvgl ui elements
-lv_obj_t *side_bar;
-lv_obj_t *top_bar;
-lv_obj_t *bottom_bar;
-lv_obj_t *lbl_power_mode;
-lv_obj_t *lbl_battery_pct;
-lv_obj_t *lbl_voltage;
-lv_obj_t *lbl_power_icon;
-lv_obj_t *lbl_btn_1;
-lv_obj_t *lbl_btn_2;
-lv_obj_t *screen_brightness_slider;
-lv_obj_t *screen_brightness;
 
 // Callback function when buttons are pressed down
 static void button_press_down_cb(void *arg, void *usr_data) {
@@ -115,84 +87,22 @@ static void setup_buttons() {
 }
 
 
-void ui_init() {
-    side_bar = lv_obj_create(lv_scr_act());
-    lv_obj_set_width(side_bar, 50);
-    lv_obj_set_height(side_bar, LCD_V_RES);
-    lv_obj_clear_flag(side_bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(side_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(side_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(side_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lbl_btn_1 = lv_label_create(side_bar);
-    lv_obj_align(lbl_btn_1, LV_ALIGN_TOP_MID, 0, 0);
-
-    lbl_btn_2 = lv_label_create(side_bar);
-    lv_obj_align(lbl_btn_2, LV_ALIGN_BOTTOM_MID, 0, 0);
-
-    top_bar = lv_obj_create(lv_scr_act());
-    lv_obj_align(top_bar, LV_ALIGN_TOP_RIGHT, 0, 0);
-    lv_obj_set_width(top_bar, LCD_H_RES - 50);
-    lv_obj_set_height(top_bar, 50);
-    lv_obj_clear_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(top_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(top_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(top_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lbl_power_mode = lv_label_create(top_bar);
-    lv_obj_align(lbl_power_mode, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    lbl_voltage = lv_label_create(top_bar);
-    lv_obj_align(lbl_voltage, LV_ALIGN_TOP_RIGHT, 0, 0);
-
-    lbl_power_icon = lv_label_create(top_bar);
-    lv_obj_align(lbl_power_icon, LV_ALIGN_BOTTOM_RIGHT, 0, 5);
-
-    lbl_battery_pct = lv_label_create(top_bar);
-    lv_obj_align(lbl_battery_pct, LV_ALIGN_BOTTOM_LEFT, 0, 5);
-
-    bottom_bar = lv_obj_create(lv_scr_act());
-    lv_obj_align(bottom_bar, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-    lv_obj_set_width(bottom_bar, LCD_H_RES - 50);
-    lv_obj_set_height(bottom_bar, 50);
-    lv_obj_clear_flag(bottom_bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(bottom_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(bottom_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(bottom_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-
-    screen_brightness_slider = lv_slider_create(lv_scr_act());
-    lv_obj_set_size(screen_brightness_slider, LCD_H_RES - 100, 25);
-    lv_obj_align(screen_brightness_slider, LV_ALIGN_CENTER, 30, 0);
-    lv_slider_set_range(screen_brightness_slider, 0, 16);
-    screen_brightness = lv_label_create(screen_brightness_slider);
-    lv_obj_align(screen_brightness, LV_ALIGN_CENTER, 0, 0);
-    lv_label_set_text(screen_brightness, "Brightness");
-    lv_slider_set_value(screen_brightness_slider, screen_brightness_step, LV_ANIM_OFF);
-}
-
 static void update_hw_info_timer_cb(void *arg) {
     if (btn_1_pressed) {
-        lbl_btn_1_value = LV_SYMBOL_LEFT;
         if (screen_brightness_step < 16) {
             screen_brightness_step++;
         }
         if (screen_brightness_step > 16) {
             screen_brightness_step = 16;
         }
-    } else {
-        lbl_btn_1_value = "";
     }
     if (btn_2_pressed) {
-        lbl_btn_2_value = LV_SYMBOL_LEFT;
         if (screen_brightness_step > 0) {
             screen_brightness_step--;
         }
         if (screen_brightness_step < 0) {
             screen_brightness_step = 0;
         }
-    } else {
-        lbl_btn_2_value = "";
     }
 
     if (last_screen_brightness_step != screen_brightness_step) {
@@ -206,37 +116,9 @@ static void update_hw_info_timer_cb(void *arg) {
 }
 
 static void update_ui() {
-    lv_label_set_text(lbl_btn_1, lbl_btn_1_value);
-    lv_label_set_text(lbl_btn_2, lbl_btn_2_value);
-    lv_slider_set_value(screen_brightness_slider, screen_brightness_step, LV_ANIM_OFF);
-    if (on_usb_power) {
-        power_icon = LV_SYMBOL_USB;
-        lv_label_set_text(lbl_power_mode, "USB Power");
-        lv_label_set_text(lbl_battery_pct, "----------");
-    } else {
-        power_icon = battery_symbols[current_battery_symbol_idx];
-        if (battery_percentage > 100) {
-            battery_percentage = 100;
-        }
-        lv_label_set_text(lbl_power_mode, "Battery Power");
-        lv_label_set_text_fmt(lbl_battery_pct, "Charge Level: %d %%", battery_percentage);
-    }
-    lv_label_set_text_fmt(lbl_voltage, "%d mV", battery_voltage);
+    // Perform your ui updates here
 
-
-    if (battery_percentage > 75 && battery_percentage <= 100) {
-        current_battery_symbol_idx = 4;
-    } else if (battery_percentage > 50 && battery_percentage <= 75) {
-        current_battery_symbol_idx = 3;
-    } else if (battery_percentage > 25 && battery_percentage <= 50) {
-        current_battery_symbol_idx = 2;
-    } else if (battery_percentage > 10 && battery_percentage <= 25) {
-        current_battery_symbol_idx = 1;
-    } else {
-        current_battery_symbol_idx = 0;
-    }
-
-    lv_label_set_text(lbl_power_icon, power_icon);
+    ESP_LOGI(TAG, "update_ui function call");
 }
 
 
@@ -270,15 +152,6 @@ void app_main(void) {
     // otherwise you can set it to true to turn on the backlight at lcd init
     lcd_init(disp_drv, &disp_handle, false);
 
-#if defined CONFIG_LV_USE_DEMO_BENCHMARK
-    // if you specified CONFIG_LV_USE_DEMO_BENCHMARK in sdkconfig, it will run lv_demo_benchmark
-    lv_demo_benchmark();
-
-#elif defined CONFIG_LV_USE_DEMO_STRESS
-    // if you specified CONFIG_LV_USE_DEMO_STRESS in sdkconfig, it will run lv_demo_stress
-    lv_demo_stress();
-#else
-    // otherwise it will show my example
 
     // configure the buttons
     setup_buttons();
@@ -313,6 +186,4 @@ void app_main(void) {
 
     // de-initialize lcd and other components
     // lvgl_port_remove_disp(disp_handle);
-
-#endif
 }

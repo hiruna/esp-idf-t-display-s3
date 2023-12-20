@@ -50,4 +50,28 @@ but you may/may not experience issues with a high clock speed due to PSRAM banwi
 
 ## SquareLine Studio
 
-TBC
+### Create a new board
+
+1. Close the SquareLine Studio application if it is already running
+2. Clone this repo
+2. Navigate to [SquareLine](./SquareLine) directory
+3. Create a compressed zip ofd the directory and name it `t_display_s3.zip`
+    * Make sure recurse and symbolic links are followed
+      * In Ubuntu, I used `zip -r t_display_s3.zip __ui_project_name__/`
+4. Create a directory named `LilyGO` inside of SquareLine Studio installation's `boards` directory
+5. Copy the [boards/t_display_s3](./SquareLine/boards/t_display_s3) directory into the `LilyGo` directory
+   * Move the `t_display_s3.zip` created earlier into the `t_display_s3` directory
+   ![squareline_tdisplay_dir.png](doc/img/squareline_tdisplay_dir.png)
+6. Open SquareLine Studio to see the T-Display-S3 board
+   ![squareline_studio_tdisplay_s3.png](doc/img/squareline_studio_tdisplay_s3.png)
+
+### Create a new SquareLine Project
+
+1. Create a new SquareLine Project using the board created previously
+   * I used the default theme settings
+2. Once the new project is opened, click on _**Export -> Create Template Project**_
+   ![squareline_export_menu.png](doc/img/squareline_export_menu.png)
+3. Export the `ui` files by clicking on  _**Export -> Export UI Files**_.
+   * Make sure to select the previously exported project's `main/ui` directory
+   ![squareline_export_ui.png](doc/img/squareline_export_ui.png)
+4. Save the project

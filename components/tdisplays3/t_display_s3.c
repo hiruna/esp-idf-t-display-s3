@@ -119,6 +119,7 @@ static void init_battery_monitor() {
     ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cali_config, &adc_cali_handle));
 }
 
+
 int get_battery_voltage() {
     int voltage, adc_raw;
 
@@ -134,7 +135,15 @@ double volts_to_percentage(double volts) {
 }
 
 int get_battery_percentage() {
-    return (int)ceil(volts_to_percentage(get_battery_voltage()));
+    return (int) ceil(volts_to_percentage((double)get_battery_voltage()/1000));
+}
+
+bool usb_power_voltage(int milliVolts) {
+    return ceilf((float) (milliVolts - 100) / 1000) == 5.0;
+}
+
+bool usb_power_connected() {
+    return usb_power_voltage((double)get_battery_voltage());
 }
 
 static void lcd_power_init(void) {
@@ -232,7 +241,7 @@ void lcd_init(lv_disp_drv_t disp_drv, lv_disp_t **disp_handle, bool backlight_on
             .task_priority = LVGL_TASK_PRIORITY,
             .task_stack = LVGL_TASK_STACK_SIZE,
             .task_affinity = 1,
-            .task_max_sleep_ms = LVGL_TASK_MAX_DELAY_MS,
+            .task_max_sleep_ms = LVGL_MAX_SLEEP_MS,
             .timer_period_ms = LVGL_TICK_PERIOD_MS
 
     };
@@ -259,7 +268,7 @@ void lcd_init(lv_disp_drv_t disp_drv, lv_disp_t **disp_handle, bool backlight_on
     *disp_handle = disp_hdl;
 
 
-    if(backlight_on) {
+    if (backlight_on) {
         lcd_backlight_on();
     }
 }
