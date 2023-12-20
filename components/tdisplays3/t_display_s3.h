@@ -69,7 +69,7 @@ extern "C" {
 
 
 // Supported alignment: 16, 32, 64.
-// A higher alignment can enables higher burst transfer size, thus a higher i80 bus throughput.
+// A higher alignment can enable higher burst transfer size, thus a higher i80 bus throughput.
 #define LCD_PSRAM_TRANS_ALIGN    64
 #define LCD_SRAM_TRANS_ALIGN     4
 
