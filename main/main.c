@@ -35,6 +35,7 @@ char *lbl_btn_1_value = "";
 char *lbl_btn_2_value = "";
 int battery_voltage;
 int battery_percentage;
+bool on_usb_power = false;
 int last_screen_brightness_step = 16;
 int screen_brightness_step = 16;
 int current_battery_symbol_idx = 0;
@@ -114,9 +115,7 @@ static void setup_buttons() {
 }
 
 
-void setup_test_ui() {
-    lvgl_port_lock(0);
-
+void ui_init() {
     side_bar = lv_obj_create(lv_scr_act());
     lv_obj_set_width(side_bar, 50);
     lv_obj_set_height(side_bar, LCD_V_RES);
@@ -170,8 +169,6 @@ void setup_test_ui() {
     lv_obj_align(screen_brightness, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(screen_brightness, "Brightness");
     lv_slider_set_value(screen_brightness_slider, screen_brightness_step, LV_ANIM_OFF);
-
-    lvgl_port_unlock();
 }
 
 static void update_hw_info_timer_cb(void *arg) {
@@ -204,6 +201,7 @@ static void update_hw_info_timer_cb(void *arg) {
     last_screen_brightness_step = screen_brightness_step;
 
     battery_voltage = get_battery_voltage();
+    on_usb_power = usb_power_voltage(battery_voltage);
     battery_percentage = (int) volts_to_percentage((double) battery_voltage / 1000);
 }
 
@@ -211,22 +209,17 @@ static void update_ui() {
     lv_label_set_text(lbl_btn_1, lbl_btn_1_value);
     lv_label_set_text(lbl_btn_2, lbl_btn_2_value);
     lv_slider_set_value(screen_brightness_slider, screen_brightness_step, LV_ANIM_OFF);
-    if (battery_voltage - 30 > NO_BAT_MILLIVOLTS) {
+    if (on_usb_power) {
         power_icon = LV_SYMBOL_USB;
-        lv_label_set_text(lbl_power_mode, "No battery");
+        lv_label_set_text(lbl_power_mode, "USB Power");
         lv_label_set_text(lbl_battery_pct, "----------");
     } else {
         power_icon = battery_symbols[current_battery_symbol_idx];
-        if (battery_voltage > BAT_CHARGE_MILLIVOLTS) {
-            lv_label_set_text(lbl_power_mode, "Battery Charging");
-            if (battery_percentage > 100) {
-                battery_percentage = 100;
-            }
-            lv_label_set_text_fmt(lbl_battery_pct, "Charge Level: %d %%", battery_percentage);
-        } else {
-            lv_label_set_text(lbl_power_mode, "Battery Discharging");
-            lv_label_set_text_fmt(lbl_battery_pct, "Charge Level: %d %%", battery_percentage);
+        if (battery_percentage > 100) {
+            battery_percentage = 100;
         }
+        lv_label_set_text(lbl_power_mode, "Battery Power");
+        lv_label_set_text_fmt(lbl_battery_pct, "Charge Level: %d %%", battery_percentage);
     }
     lv_label_set_text_fmt(lbl_voltage, "%d mV", battery_voltage);
 
@@ -249,18 +242,9 @@ static void update_ui() {
 
 static void ui_update_task(void *pvParam) {
     // setup the test ui
-    setup_test_ui();
-
-    // Configure a periodic timer to update the battery voltage, brightness level etc
-    const esp_timer_create_args_t periodic_timer_args = {
-            .callback = &update_hw_info_timer_cb,
-            .name = "update_hw_info_timer"
-    };
-
-    esp_timer_handle_t ui_update_timer_handle;
-    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &ui_update_timer_handle));
-    // update the hw info 250 milliseconds
-    ESP_ERROR_CHECK(esp_timer_start_periodic(ui_update_timer_handle, 250 * 1000));
+    lvgl_port_lock(0);
+    ui_init();
+    lvgl_port_unlock();
 
     while (1) {
         // update the ui every 50 milliseconds
@@ -298,6 +282,17 @@ void app_main(void) {
 
     // configure the buttons
     setup_buttons();
+
+    // Configure a periodic timer to update the battery voltage, brightness level etc
+    const esp_timer_create_args_t periodic_timer_args = {
+            .callback = &update_hw_info_timer_cb,
+            .name = "update_hw_info_timer"
+    };
+
+    esp_timer_handle_t update_hw_info_timer_handle;
+    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &update_hw_info_timer_handle));
+    // update the hw info 250 milliseconds
+    ESP_ERROR_CHECK(esp_timer_start_periodic(update_hw_info_timer_handle, 250 * 1000));
 
     // configure a FreeRTOS task, pinned to the second core (core 0 should be used for hw such as wifi, bt etc)
     xTaskCreatePinnedToCore(ui_update_task, "update_ui", 4096 * 2, NULL, 0, NULL, 1);
