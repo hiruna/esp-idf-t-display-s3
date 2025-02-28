@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -12,33 +12,37 @@
 #pragma once
 
 #include "esp_err.h"
-#include "esp_lcd_panel_io.h"
-#include "esp_lcd_panel_ops.h"
 #include "lvgl.h"
+#include "esp_lvgl_port_disp.h"
+#include "esp_lvgl_port_touch.h"
+#include "esp_lvgl_port_knob.h"
+#include "esp_lvgl_port_button.h"
+#include "esp_lvgl_port_usbhid.h"
 
-#if __has_include ("esp_lcd_touch.h")
-#include "esp_lcd_touch.h"
-#define ESP_LVGL_PORT_TOUCH_COMPONENT 1
-#endif
-
-#if __has_include ("iot_knob.h")
-#include "iot_knob.h"
-#include "iot_button.h"
-#define ESP_LVGL_PORT_KNOB_COMPONENT 1
-#endif
-
-#if __has_include ("iot_button.h")
-#include "iot_button.h"
-#define ESP_LVGL_PORT_BUTTON_COMPONENT 1
-#endif
-
-#if __has_include ("usb/hid_host.h")
-#define ESP_LVGL_PORT_USB_HOST_HID_COMPONENT 1
+#if LVGL_VERSION_MAJOR == 8
+#include "esp_lvgl_port_compatibility.h"
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @brief LVGL Port task event type
+ */
+typedef enum {
+    LVGL_PORT_EVENT_DISPLAY = 0x01,
+    LVGL_PORT_EVENT_TOUCH   = 0x02,
+    LVGL_PORT_EVENT_USER    = 0x80,
+} lvgl_port_event_type_t;
+
+/**
+ * @brief LVGL Port task events
+ */
+typedef struct {
+    lvgl_port_event_type_t type;
+    void *param;
+} lvgl_port_event_t;
 
 /**
  * @brief Init configuration structure
@@ -52,92 +56,13 @@ typedef struct {
 } lvgl_port_cfg_t;
 
 /**
- * @brief Rotation configuration
- */
-typedef struct {
-    bool swap_xy;  /*!< LCD Screen swapped X and Y (in esp_lcd driver) */
-    bool mirror_x; /*!< LCD Screen mirrored X (in esp_lcd driver) */
-    bool mirror_y; /*!< LCD Screen mirrored Y (in esp_lcd driver) */
-} lvgl_port_rotation_cfg_t;
-
-/**
- * @brief Configuration display structure
- */
-typedef struct {
-    esp_lcd_panel_io_handle_t io_handle;    /*!< LCD panel IO handle */
-    esp_lcd_panel_handle_t panel_handle;    /*!< LCD panel handle */
-    uint32_t    buffer_size;    /*!< Size of the buffer for the screen in pixels */
-    bool        double_buffer;  /*!< True, if should be allocated two buffers */
-    uint32_t    hres;           /*!< LCD display horizontal resolution */
-    uint32_t    vres;           /*!< LCD display vertical resolution */
-    bool        monochrome;     /*!< True, if display is monochrome and using 1bit for 1px */
-    lvgl_port_rotation_cfg_t rotation;    /*!< Default values of the screen rotation */
-
-    struct {
-        unsigned int buff_dma: 1;    /*!< Allocated LVGL buffer will be DMA capable */
-        unsigned int buff_spiram: 1; /*!< Allocated LVGL buffer will be in PSRAM */
-    } flags;
-} lvgl_port_display_cfg_t;
-
-#ifdef ESP_LVGL_PORT_TOUCH_COMPONENT
-/**
- * @brief Configuration touch structure
- */
-typedef struct {
-    lv_disp_t *disp;    /*!< LVGL display handle (returned from lvgl_port_add_disp) */
-    esp_lcd_touch_handle_t   handle;   /*!< LCD touch IO handle */
-} lvgl_port_touch_cfg_t;
-#endif
-
-#ifdef ESP_LVGL_PORT_KNOB_COMPONENT
-/**
- * @brief Configuration of the encoder structure
- */
-typedef struct {
-    lv_disp_t *disp;    /*!< LVGL display handle (returned from lvgl_port_add_disp) */
-    const knob_config_t *encoder_a_b;
-    const button_config_t *encoder_enter;  /*!< Navigation button for enter */
-} lvgl_port_encoder_cfg_t;
-#endif
-
-#ifdef ESP_LVGL_PORT_BUTTON_COMPONENT
-/**
- * @brief Configuration of the navigation buttons structure
- */
-typedef struct {
-    lv_disp_t *disp;                /*!< LVGL display handle (returned from lvgl_port_add_disp) */
-    const button_config_t *button_prev;   /*!< Navigation button for previous */
-    const button_config_t *button_next;   /*!< Navigation button for next */
-    const button_config_t *button_enter;  /*!< Navigation button for enter */
-} lvgl_port_nav_btns_cfg_t;
-#endif
-
-#ifdef ESP_LVGL_PORT_USB_HOST_HID_COMPONENT
-/**
- * @brief Configuration of the mouse input
- */
-typedef struct {
-    lv_disp_t *disp;        /*!< LVGL display handle (returned from lvgl_port_add_disp) */
-    uint8_t sensitivity;    /*!< Mouse sensitivity (cannot be zero) */
-    lv_obj_t *cursor_img;   /*!< Mouse cursor image, if NULL then used default */
-} lvgl_port_hid_mouse_cfg_t;
-
-/**
- * @brief Configuration of the keyboard input
- */
-typedef struct {
-    lv_disp_t *disp;        /*!< LVGL display handle (returned from lvgl_port_add_disp) */
-} lvgl_port_hid_keyboard_cfg_t;
-#endif
-
-/**
  * @brief LVGL port configuration structure
  *
  */
 #define ESP_LVGL_PORT_INIT_CONFIG() \
     {                               \
         .task_priority = 4,       \
-        .task_stack = 4096,       \
+        .task_stack = 7168,       \
         .task_affinity = -1,      \
         .task_max_sleep_ms = 500, \
         .timer_period_ms = 5,     \
@@ -164,126 +89,9 @@ esp_err_t lvgl_port_init(const lvgl_port_cfg_t *cfg);
  *
  * @return
  *      - ESP_OK                    on success
+ *      - ESP_ERR_TIMEOUT           when stopping the LVGL task times out
  */
 esp_err_t lvgl_port_deinit(void);
-
-/**
- * @brief Add display handling to LVGL
- *
- * @note Allocated memory in this function is not free in deinit. You must call lvgl_port_remove_disp for free all memory!
- *
- * @param disp_cfg Display configuration structure
- * @return Pointer to LVGL display or NULL when error occured
- */
-lv_disp_t *lvgl_port_add_disp(const lvgl_port_display_cfg_t *disp_cfg);
-
-/**
- * @brief Remove display handling from LVGL
- *
- * @note Free all memory used for this display.
- *
- * @return
- *      - ESP_OK                    on success
- */
-esp_err_t lvgl_port_remove_disp(lv_disp_t *disp);
-
-#ifdef ESP_LVGL_PORT_TOUCH_COMPONENT
-/**
- * @brief Add LCD touch as an input device
- *
- * @note Allocated memory in this function is not free in deinit. You must call lvgl_port_remove_touch for free all memory!
- *
- * @param touch_cfg Touch configuration structure
- * @return Pointer to LVGL touch input device or NULL when error occured
- */
-lv_indev_t *lvgl_port_add_touch(const lvgl_port_touch_cfg_t *touch_cfg);
-
-/**
- * @brief Remove selected LCD touch from input devices
- *
- * @note Free all memory used for this display.
- *
- * @return
- *      - ESP_OK                    on success
- */
-esp_err_t lvgl_port_remove_touch(lv_indev_t *touch);
-#endif
-
-#ifdef ESP_LVGL_PORT_KNOB_COMPONENT
-/**
- * @brief Add encoder as an input device
- *
- * @note Allocated memory in this function is not free in deinit. You must call lvgl_port_remove_encoder for free all memory!
- *
- * @param encoder_cfg Encoder configuration structure
- * @return Pointer to LVGL encoder input device or NULL when error occured
- */
-lv_indev_t *lvgl_port_add_encoder(const lvgl_port_encoder_cfg_t *encoder_cfg);
-
-/**
- * @brief Remove encoder from input devices
- *
- * @note Free all memory used for this input device.
- *
- * @return
- *      - ESP_OK                    on success
- */
-esp_err_t lvgl_port_remove_encoder(lv_indev_t *encoder);
-#endif
-
-#ifdef ESP_LVGL_PORT_BUTTON_COMPONENT
-/**
- * @brief Add buttons as an input device
- *
- * @note Allocated memory in this function is not free in deinit. You must call lvgl_port_remove_navigation_buttons for free all memory!
- *
- * @param buttons_cfg Buttons configuration structure
- * @return Pointer to LVGL buttons input device or NULL when error occured
- */
-lv_indev_t *lvgl_port_add_navigation_buttons(const lvgl_port_nav_btns_cfg_t *buttons_cfg);
-
-/**
- * @brief Remove selected buttons from input devices
- *
- * @note Free all memory used for this input device.
- *
- * @return
- *      - ESP_OK                    on success
- */
-esp_err_t lvgl_port_remove_navigation_buttons(lv_indev_t *buttons);
-#endif
-
-#ifdef ESP_LVGL_PORT_USB_HOST_HID_COMPONENT
-/**
- * @brief Add USB HID mouse as an input device
- *
- * @note The USB host must be initialized before. Use `usb_host_install` for host initialization.
- *
- * @param mouse_cfg mouse configuration structure
- * @return Pointer to LVGL buttons input device or NULL when error occured
- */
-lv_indev_t *lvgl_port_add_usb_hid_mouse_input(const lvgl_port_hid_mouse_cfg_t *mouse_cfg);
-
-/**
- * @brief Add USB HID keyboard as an input device
- *
- * @note The USB host must be initialized before. Use `usb_host_install` for host initialization.
- *
- * @param keyboard_cfg keyboard configuration structure
- * @return Pointer to LVGL buttons input device or NULL when error occured
- */
-lv_indev_t *lvgl_port_add_usb_hid_keyboard_input(const lvgl_port_hid_keyboard_cfg_t *keyboard_cfg);
-
-/**
- * @brief Remove selected USB HID from input devices
- *
- * @note Free all memory used for this input device. When removed all HID devices, the HID task will be freed.
- *
- * @return
- *      - ESP_OK                    on success
- */
-esp_err_t lvgl_port_remove_usb_hid_input(lv_indev_t *hid);
-#endif
 
 /**
  * @brief Take LVGL mutex
@@ -308,10 +116,10 @@ void lvgl_port_unlock(void);
  *
  * @param disp          LVGL display handle (returned from lvgl_port_add_disp)
  */
-void lvgl_port_flush_ready(lv_disp_t *disp);
+void lvgl_port_flush_ready(lv_display_t *disp);
 
 /**
- * @brief Stop lvgl task
+ * @brief Stop lvgl timer
  *
  *
  * @return
@@ -321,7 +129,7 @@ void lvgl_port_flush_ready(lv_disp_t *disp);
 esp_err_t lvgl_port_stop(void);
 
 /**
- * @brief Resume lvgl task
+ * @brief Resume lvgl timer
  *
  *
  * @return
@@ -329,6 +137,20 @@ esp_err_t lvgl_port_stop(void);
  *      - ESP_ERR_INVALID_STATE if the timer is not running
  */
 esp_err_t lvgl_port_resume(void);
+
+/**
+ * @brief Notify LVGL task, that display need reload
+ *
+ * @note It is called from LVGL events and touch interrupts
+ *
+ * @param event     event type
+ * @param param     parameter is not used, keep for backwards compatibility
+ * @return
+ *      - ESP_OK on success
+ *      - ESP_ERR_NOT_SUPPORTED if it is not implemented
+ *      - ESP_ERR_INVALID_STATE if queue is not initialized (can be returned after LVGL deinit)
+ */
+esp_err_t lvgl_port_task_wake(lvgl_port_event_type_t event, void *param);
 
 #ifdef __cplusplus
 }

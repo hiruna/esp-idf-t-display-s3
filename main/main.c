@@ -4,9 +4,10 @@
 #include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
 #include "t_display_s3.h"
 #include "iot_button.h"
+#include "button_gpio.h"
+
 
 #if defined CONFIG_LV_USE_DEMO_BENCHMARK
 #include "lvgl/demos/benchmark/lv_demo_benchmark.h"
@@ -16,18 +17,16 @@
 
 #define TAG "ESP-IDF-T-Display-S3-Example"
 
+#define NUM_BUTTONS 2
+
 // gpio nums of the buttons
-static gpio_num_t btn_gpio_nums[2] = {
+static gpio_num_t btn_gpio_nums[NUM_BUTTONS] = {
         BTN_PIN_NUM_1,
         BTN_PIN_NUM_2,
 };
 
 // store button handles
-button_handle_t btn_handles[2];
-
-// keep a track of button press states
-bool btn_1_pressed = false;
-bool btn_2_pressed = false;
+button_handle_t btn_handles[NUM_BUTTONS];
 
 // used for setup_test_ui() function
 char *power_icon = LV_SYMBOL_POWER;
@@ -36,8 +35,6 @@ char *lbl_btn_2_value = "";
 int battery_voltage;
 int battery_percentage;
 bool on_usb_power = false;
-int last_screen_brightness_step = 16;
-int screen_brightness_step = 16;
 int current_battery_symbol_idx = 0;
 char *battery_symbols[5] = {
         LV_SYMBOL_BATTERY_EMPTY,
@@ -46,6 +43,9 @@ char *battery_symbols[5] = {
         LV_SYMBOL_BATTERY_3,
         LV_SYMBOL_BATTERY_FULL
 };
+
+TaskHandle_t lcd_brightness_task_hdl;
+esp_timer_handle_t lcd_brightness_timer_hdl;
 
 // lvgl ui elements
 lv_obj_t *side_bar;
@@ -60,53 +60,80 @@ lv_obj_t *lbl_btn_2;
 lv_obj_t *screen_brightness_slider;
 lv_obj_t *screen_brightness;
 
-// Callback function when buttons are pressed down
-static void button_press_down_cb(void *arg, void *usr_data) {
-    button_handle_t button = (button_handle_t) arg;
-    if (button == btn_handles[0]) {
-//        ESP_LOGI(TAG, "0 BUTTON_PRESS_DOWN");
-        btn_1_pressed = true;
+static int get_button_idx(button_handle_t btn_hdl) {
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        if(btn_handles[i]==btn_hdl) {
+            return i;
+        }
     }
-    if (button == btn_handles[1]) {
-//        ESP_LOGI(TAG, "1 BUTTON_PRESS_DOWN");
-        btn_2_pressed = true;
-    }
+    return -1;
 }
 
 // Callback function when buttons are released
-static void button_press_up_cb(void *arg, void *usr_data) {
-    button_handle_t button = (button_handle_t) arg;
-    if (button == btn_handles[0]) {
-//        ESP_LOGI(TAG, "0 BUTTON_PRESS_UP");
-        btn_1_pressed = false;
-    }
-    if (button == btn_handles[1]) {
-//        ESP_LOGI(TAG, "1 BUTTON_PRESS_UP");
-        btn_2_pressed = false;
+static void button_event_handler_cb(void *arg, void *usr_data) {
+    button_handle_t button_hdl = (button_handle_t) arg;
+    button_event_t btn_event = iot_button_get_event(button_hdl);
+    int btn_idx = get_button_idx(button_hdl);
+
+    ESP_LOGI(TAG, "button %d, event %s", btn_idx, iot_button_get_event_str(btn_event));
+    switch (btn_event) {
+        case BUTTON_PRESS_DOWN:
+        case BUTTON_LONG_PRESS_START:
+        case BUTTON_LONG_PRESS_HOLD:
+            if(btn_idx == 0) {
+                lbl_btn_1_value = LV_SYMBOL_LEFT;
+                lcd_increment_brightness_step();
+            }
+            if(btn_idx == 1) {
+                lbl_btn_2_value = LV_SYMBOL_LEFT;
+                lcd_decrement_brightness_step();
+            }
+            break;
+        default:
+            if(btn_idx == 0) {
+                lbl_btn_1_value = "";;
+            }
+            if(btn_idx == 1) {
+                lbl_btn_2_value = "";;
+            }
     }
 }
 
 // Function to configure the boo & GPIO14 buttons using espressif/button component
 static void setup_buttons() {
-    for (size_t i = 0; i < 2; i++) {
+    for (size_t i = 0; i < NUM_BUTTONS; i++) {
         ESP_LOGI(TAG, "Configuring button %ld", ((int32_t) i) + 1);
-        button_config_t gpio_btn_cfg = {
-                .type = BUTTON_TYPE_GPIO,
-                .short_press_time = 500,
-                .gpio_button_config = {
-                        .gpio_num = (int32_t) btn_gpio_nums[i],
-                        .active_level = 0,
-                },
+        button_config_t btn_cfg = {0};
+        button_gpio_config_t btn_gpio_cfg = {
+                .gpio_num = (int32_t) btn_gpio_nums[i],
+                .active_level = 0,
         };
-        button_handle_t btn_handle = iot_button_create(&gpio_btn_cfg);
+        button_handle_t btn_handle;
+        esp_err_t err = iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &btn_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "error iot_button_new_gpio_device [button %d]: %s", i + 1, esp_err_to_name(err));
+        }
         if (NULL == btn_handle) {
             ESP_LOGE(TAG, "Button %d create failed", i + 1);
         }
-        esp_err_t err = iot_button_register_cb(btn_handle, BUTTON_PRESS_DOWN, button_press_down_cb, NULL);
+        err = iot_button_register_cb(btn_handle, BUTTON_PRESS_DOWN, NULL, button_event_handler_cb, NULL);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "error iot_button_register_cb [button %d]: %s", i + 1, esp_err_to_name(err));
         }
-        err = iot_button_register_cb(btn_handle, BUTTON_PRESS_UP, button_press_up_cb, NULL);
+        err = iot_button_register_cb(btn_handle, BUTTON_PRESS_UP, NULL, button_event_handler_cb, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "error iot_button_register_cb [button %d]: %s", i + 1, esp_err_to_name(err));
+        }
+        button_event_args_t long_press_start_args = {
+                .long_press = {
+                        .press_time = 300,
+                }
+        };
+        err = iot_button_register_cb(btn_handle, BUTTON_LONG_PRESS_START, &long_press_start_args, button_event_handler_cb, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "error iot_button_register_cb [button %d]: %s", i + 1, esp_err_to_name(err));
+        }
+        err = iot_button_register_cb(btn_handle, BUTTON_LONG_PRESS_HOLD, NULL, button_event_handler_cb, NULL);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "error iot_button_register_cb [button %d]: %s", i + 1, esp_err_to_name(err));
         }
@@ -116,10 +143,10 @@ static void setup_buttons() {
 
 
 void ui_init() {
-    side_bar = lv_obj_create(lv_scr_act());
+    side_bar = lv_obj_create(lv_screen_active());
     lv_obj_set_width(side_bar, 50);
     lv_obj_set_height(side_bar, LCD_V_RES);
-    lv_obj_clear_flag(side_bar, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(side_bar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(side_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(side_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(side_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -130,11 +157,11 @@ void ui_init() {
     lbl_btn_2 = lv_label_create(side_bar);
     lv_obj_align(lbl_btn_2, LV_ALIGN_BOTTOM_MID, 0, 0);
 
-    top_bar = lv_obj_create(lv_scr_act());
+    top_bar = lv_obj_create(lv_screen_active());
     lv_obj_align(top_bar, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_obj_set_width(top_bar, LCD_H_RES - 50);
     lv_obj_set_height(top_bar, 50);
-    lv_obj_clear_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(top_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(top_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(top_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -151,55 +178,27 @@ void ui_init() {
     lbl_battery_pct = lv_label_create(top_bar);
     lv_obj_align(lbl_battery_pct, LV_ALIGN_BOTTOM_LEFT, 0, 5);
 
-    bottom_bar = lv_obj_create(lv_scr_act());
+    bottom_bar = lv_obj_create(lv_screen_active());
     lv_obj_align(bottom_bar, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_obj_set_width(bottom_bar, LCD_H_RES - 50);
     lv_obj_set_height(bottom_bar, 50);
-    lv_obj_clear_flag(bottom_bar, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(bottom_bar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(bottom_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(bottom_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(bottom_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 
-    screen_brightness_slider = lv_slider_create(lv_scr_act());
+    screen_brightness_slider = lv_slider_create(lv_screen_active());
     lv_obj_set_size(screen_brightness_slider, LCD_H_RES - 100, 25);
     lv_obj_align(screen_brightness_slider, LV_ALIGN_CENTER, 30, 0);
     lv_slider_set_range(screen_brightness_slider, 0, 16);
     screen_brightness = lv_label_create(screen_brightness_slider);
     lv_obj_align(screen_brightness, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(screen_brightness, "Brightness");
-    lv_slider_set_value(screen_brightness_slider, screen_brightness_step, LV_ANIM_OFF);
+    lv_slider_set_value(screen_brightness_slider, lcd_get_brightness_step(), LV_ANIM_OFF);
 }
 
 static void update_hw_info_timer_cb(void *arg) {
-    if (btn_1_pressed) {
-        lbl_btn_1_value = LV_SYMBOL_LEFT;
-        if (screen_brightness_step < 16) {
-            screen_brightness_step++;
-        }
-        if (screen_brightness_step > 16) {
-            screen_brightness_step = 16;
-        }
-    } else {
-        lbl_btn_1_value = "";
-    }
-    if (btn_2_pressed) {
-        lbl_btn_2_value = LV_SYMBOL_LEFT;
-        if (screen_brightness_step > 0) {
-            screen_brightness_step--;
-        }
-        if (screen_brightness_step < 0) {
-            screen_brightness_step = 0;
-        }
-    } else {
-        lbl_btn_2_value = "";
-    }
-
-    if (last_screen_brightness_step != screen_brightness_step) {
-        lcd_brightness_set(ceil(screen_brightness_step * (int) (100 / (float) 16)));
-    }
-    last_screen_brightness_step = screen_brightness_step;
-
     battery_voltage = get_battery_voltage();
     on_usb_power = usb_power_voltage(battery_voltage);
     battery_percentage = (int) volts_to_percentage((double) battery_voltage / 1000);
@@ -208,7 +207,7 @@ static void update_hw_info_timer_cb(void *arg) {
 static void update_ui() {
     lv_label_set_text(lbl_btn_1, lbl_btn_1_value);
     lv_label_set_text(lbl_btn_2, lbl_btn_2_value);
-    lv_slider_set_value(screen_brightness_slider, screen_brightness_step, LV_ANIM_OFF);
+    lv_slider_set_value(screen_brightness_slider, lcd_get_brightness_step(), LV_ANIM_OFF);
     if (on_usb_power) {
         power_icon = LV_SYMBOL_USB;
         lv_label_set_text(lbl_power_mode, "USB Power");
@@ -248,7 +247,7 @@ static void ui_update_task(void *pvParam) {
 
     while (1) {
         // update the ui every 50 milliseconds
-        vTaskDelay(pdMS_TO_TICKS(50));
+        //vTaskDelay(pdMS_TO_TICKS(50));
         if (lvgl_port_lock(0)) {
             // update ui under lvgl semaphore lock
             update_ui();
@@ -261,7 +260,7 @@ static void ui_update_task(void *pvParam) {
 
 void app_main(void) {
     // LVGL display driver
-    static lv_disp_drv_t disp_drv;
+    static lv_display_t *disp_drv;
     // LVGL display handle
     static lv_disp_t *disp_handle;
 
@@ -297,19 +296,9 @@ void app_main(void) {
     // configure a FreeRTOS task, pinned to the second core (core 0 should be used for hw such as wifi, bt etc)
     xTaskCreatePinnedToCore(ui_update_task, "update_ui", 4096 * 2, NULL, 0, NULL, 1);
 
-    // this is a blocking action to demonstrate the lcd brightness fade in using a simple loop
-    vTaskDelay(pdMS_TO_TICKS(100));
-    screen_brightness_step = 0;
-    last_screen_brightness_step = 0;
-    lcd_brightness_set(screen_brightness_step);
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    for (int i = 0; i <= 16; i++) {
-        screen_brightness_step++;
-        last_screen_brightness_step++;
-        lcd_brightness_set(ceil(screen_brightness_step * (int) (100 / (float) 16)));
-        vTaskDelay(pdMS_TO_TICKS(70));
-    }
+    // demonstrate the lcd brightness fade using aw9364 driver
+    lcd_set_brightness_pct_fade(100,3000);
+//    vTaskDelay(pdMS_TO_TICKS(100));
 
     // de-initialize lcd and other components
     // lvgl_port_remove_disp(disp_handle);

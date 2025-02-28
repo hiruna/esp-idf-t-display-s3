@@ -6,6 +6,7 @@
 #include <esp_lcd_panel_st7789.h>
 #include <driver/ledc.h>
 #include "math.h"
+#include "aw9364.h"
 //
 
 
@@ -15,6 +16,8 @@ static const char *TAG = "esp_idf_t_display_s3";
 static adc_oneshot_unit_handle_t adc_handle;
 // ADC calibration handle for battery voltage monitoring
 static adc_cali_handle_t adc_cali_handle;
+// AW9364 handle (brightness controller)
+static aw9364_dev_handle_t aw9364_dev_hdl;
 
 // initialize the LCD I80 bus
 static void init_lcd_i80_bus(esp_lcd_panel_io_handle_t *io_handle, void *user_ctx) {
@@ -52,9 +55,9 @@ static void init_lcd_i80_bus(esp_lcd_panel_io_handle_t *io_handle, void *user_ct
                     .dc_dummy_level = LCD_I80_DC_DUMMY_LEVEL,
                     .dc_data_level = LCD_I80_DC_DATA_LEVEL,
             },
-            .flags = {
-                    .swap_color_bytes = !LV_COLOR_16_SWAP, // Swap can be done in LvGL (default) or DMA
-            },
+//            .flags = {
+//                    .swap_color_bytes = !LV_COLOR_16_SWAP, // Swap can be done in LvGL (default) or DMA
+//            },
             .user_ctx = user_ctx,
             .lcd_cmd_bits = LCD_CMD_BITS,
             .lcd_param_bits = LCD_PARAM_BITS,
@@ -180,35 +183,46 @@ static void lcd_brightness_init(void) {
     const ledc_timer_config_t lcd_backlight_timer = {
             .speed_mode = LEDC_LOW_SPEED_MODE,
             .duty_resolution = LEDC_TIMER_10_BIT,
-            .timer_num = 1,
+            .timer_num = LEDC_TIMER_1,
             .freq_hz = 5000,
             .clk_cfg = LEDC_AUTO_CLK
     };
 
-    ESP_ERROR_CHECK(ledc_timer_config(&lcd_backlight_timer));
-    ESP_ERROR_CHECK(ledc_channel_config(&lcd_backlight_channel));
+    ESP_LOGI(TAG, "aw9364_init");
+    esp_err_t err = aw9364_init(&lcd_backlight_channel, &lcd_backlight_timer, &aw9364_dev_hdl);
+    ESP_ERROR_CHECK(err);
 }
 
-void lcd_brightness_set(int brightness_percent) {
-    if (brightness_percent > 100) {
-        brightness_percent = 100;
-    }
-    if (brightness_percent < 0) {
-        brightness_percent = 0;
-    }
-
-    ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness_percent);
-    uint32_t duty_cycle = (1023 * brightness_percent) / 100; // LEDC resolution set to 10bits, thus: 100% = 1023
-    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_BK_LIGHT_LEDC_CH, duty_cycle));
-    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_BK_LIGHT_LEDC_CH));
+void lcd_set_brightness_step(uint8_t brightness_step) {
+    ESP_ERROR_CHECK(aw9364_set_brightness_step(aw9364_dev_hdl, brightness_step, 0));
 }
 
-void lcd_backlight_off(void) {
-    lcd_brightness_set(0);
+void lcd_set_brightness_step_fade(uint8_t brightness_step, uint32_t fade_time_ms) {
+    ESP_ERROR_CHECK(aw9364_set_brightness_step(aw9364_dev_hdl, brightness_step, fade_time_ms));
 }
 
-void lcd_backlight_on(void) {
-    lcd_brightness_set(100);
+void lcd_set_brightness_pct(uint8_t brightness_percent) {
+    ESP_ERROR_CHECK(aw9364_set_brightness_pct(aw9364_dev_hdl, brightness_percent, 0));
+}
+
+void lcd_set_brightness_pct_fade(uint8_t brightness_percent, uint32_t fade_time_ms) {
+    ESP_ERROR_CHECK(aw9364_set_brightness_pct(aw9364_dev_hdl, brightness_percent, fade_time_ms));
+}
+
+void lcd_increment_brightness_step() {
+    ESP_ERROR_CHECK(aw9364_increment_brightness_step(aw9364_dev_hdl, 0));
+}
+
+void lcd_decrement_brightness_step() {
+    ESP_ERROR_CHECK(aw9364_decrement_brightness_step(aw9364_dev_hdl, 0));
+}
+
+uint8_t lcd_get_brightness_step() {
+    return aw9364_get_brightness_step(aw9364_dev_hdl);
+}
+
+uint8_t lcd_get_brightness_pct() {
+    return aw9364_get_brightness_pct(aw9364_dev_hdl);
 }
 
 static lv_disp_t *lcd_lvgl_add_disp(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle) {
@@ -222,6 +236,7 @@ static lv_disp_t *lcd_lvgl_add_disp(esp_lcd_panel_io_handle_t io_handle, esp_lcd
             .hres = LCD_H_RES,
             .vres = LCD_V_RES,
             .monochrome = false,
+            .color_format = LV_COLOR_FORMAT_RGB565,
             /* Rotation values must be same as used in esp_lcd for initial settings of the screen */
             .rotation = {
                     .swap_xy = true,
@@ -230,12 +245,13 @@ static lv_disp_t *lcd_lvgl_add_disp(esp_lcd_panel_io_handle_t io_handle, esp_lcd
             },
             .flags = {
                     .buff_spiram = true,
+                    .swap_bytes = true,
             }
     };
     return lvgl_port_add_disp(&disp_cfg);
 }
 
-void lcd_init(lv_disp_drv_t disp_drv, lv_disp_t **disp_handle, bool backlight_on) {
+void lcd_init(lv_disp_t *disp_drv, lv_disp_t **disp_handle, bool backlight_on) {
     /* lvgl_port initialization */
     const lvgl_port_cfg_t lvgl_cfg = {
             .task_priority = LVGL_TASK_PRIORITY,
@@ -267,8 +283,7 @@ void lcd_init(lv_disp_drv_t disp_drv, lv_disp_t **disp_handle, bool backlight_on
 
     *disp_handle = disp_hdl;
 
-
     if (backlight_on) {
-        lcd_backlight_on();
+        lcd_set_brightness_step(100);
     }
 }

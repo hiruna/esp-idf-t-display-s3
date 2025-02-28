@@ -7,8 +7,8 @@ This code follows a similar structure to the code provided in [esp-bsp](https://
 
 ## Tested Hardware & Software Framework(s)
 * LilyGO T-Display S3 [v1.2] (non-touch)
-  * ESP-IDF Version 5.3.x ([master branch](https://github.com/espressif/esp-idf))
-  * LVGL 8.3.x
+  * ESP-IDF Version 5.5.x ([master branch](https://github.com/espressif/esp-idf))
+  * LVGL 9.2.x
 
 ## Capabilities
 
@@ -16,7 +16,7 @@ This project demonstrates the following capabilities:
 
 * Configure the ST7789 display using the I80 Bus
   * Screen orientation is landscape where the buttons are facing towards the left
-* Screen brightness control using LEDC driver
+* Screen brightness control using [hiruna/esp-idf-aw9364](https://github.com/hiruna/esp-idf-aw9364.git)
   * 16-step brightness control
     * NOTE: according to the LilyGO [T-Display S3 Datasheet](https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/schematic/T_Display_S3.pdf), the board is equipped with a [AW9364DNR Dimming LED Driver](https://datasheet.lcsc.com/lcsc/1912111437_AWINIC-Shanghai-Awinic-Tech-AW9364DNR_C401007.pdf)
       capable of 16-step brightness control.

@@ -1,33 +1,65 @@
 dependencies:
   espressif/button:
-    component_hash: ba2b069cc8d7d485f3d528c5187fd80599144e8d9ef53a883bc09b46cd608aab
+    component_hash: a405a99689f636e84cd67da34a85a88d0d3a1aa514a28f60d18bd370c1378e0b
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: idf
+      require: private
+      version: '>=4.0'
     source:
-      service_url: https://api.components.espressif.com/
+      registry_url: https://components.espressif.com/
       type: service
-    version: 3.1.3
+    version: 4.0.0
   espressif/cmake_utilities:
     component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
     source:
-      service_url: https://api.components.espressif.com/
+      registry_url: https://components.espressif.com
       type: service
     version: 0.5.3
   espressif/esp_lvgl_port:
-    component_hash: b43dc04720d126cbfe14d53a84787e4c24b7bd7f15468e224c930ad3ffb32258
+    component_hash: 7af35e52be4a7f87ebb92d62689d720ab005a4c7b94c25f110e516136c348ceb
+    dependencies:
+    - name: idf
+      version: '>=4.4'
+    - name: lvgl/lvgl
+      public: true
+      version: '>=8,<10'
     source:
-      service_url: https://api.components.espressif.com/
-      type: service
-    version: 1.4.0
+      git: https://github.com/espressif/esp-bsp.git
+      path: components/esp_lvgl_port
+      type: git
+    version: 09f0b14ae8b28b46d5e6a5927b1634009954c247
+  hiruna/esp-idf-aw9364:
+    component_hash: 4564086e52d5a39b267243f32cf9318b3ff9ae43180634f533b5a970b8812e8c
+    dependencies: []
+    source:
+      git: https://github.com/hiruna/esp-idf-aw9364.git
+      path: .
+      type: git
+    version: 88960d249a5219e4e4a2f0715b9444954b005e93
   idf:
-    component_hash: null
     source:
       type: idf
-    version: 5.3.0
+    version: 5.5.0
   lvgl/lvgl:
-    component_hash: 51022b16bce6ee90f54a8bd21cd6d497d886916899b577b1bebb9125b91e23fc
+    component_hash: 096c69af22eaf8a2b721e3913da91918c5e6bf1a762a113ec01f401aa61337a0
+    dependencies: []
     source:
-      service_url: https://api.components.espressif.com/
+      registry_url: https://components.espressif.com/
       type: service
-    version: 8.3.10
-manifest_hash: d499107dcf2216655985f27f101ddbdac0fe36cdaf05f25da5089a766f0ee729
+    version: 9.2.2
+direct_dependencies:
+- espressif/button
+- espressif/esp_lvgl_port
+- hiruna/esp-idf-aw9364
+- idf
+manifest_hash: 557f168c1a861f43caf2f57fc776f31dd05bfb1c3a4d8a2bdbe9b9c4c3026d5b
 target: esp32s3
-version: 1.0.0
+version: 2.0.0

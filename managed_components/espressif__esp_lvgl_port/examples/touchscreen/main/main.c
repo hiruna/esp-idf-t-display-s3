@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2024 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -51,13 +51,16 @@
 
 static const char *TAG = "EXAMPLE";
 
+// LVGL image declare
+LV_IMG_DECLARE(esp_logo)
+
 /* LCD IO and panel */
 static esp_lcd_panel_io_handle_t lcd_io = NULL;
 static esp_lcd_panel_handle_t lcd_panel = NULL;
 static esp_lcd_touch_handle_t touch_handle = NULL;
 
 /* LVGL display and touch */
-static lv_disp_t *lvgl_disp = NULL;
+static lv_display_t *lvgl_disp = NULL;
 static lv_indev_t *lvgl_touch_indev = NULL;
 
 static esp_err_t app_lcd_init(void)
@@ -177,12 +180,14 @@ static esp_err_t app_lvgl_init(void)
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = lcd_io,
         .panel_handle = lcd_panel,
-        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_DRAW_BUFF_HEIGHT * sizeof(uint16_t),
+        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_DRAW_BUFF_HEIGHT,
         .double_buffer = EXAMPLE_LCD_DRAW_BUFF_DOUBLE,
         .hres = EXAMPLE_LCD_H_RES,
         .vres = EXAMPLE_LCD_V_RES,
         .monochrome = false,
-        /* Rotation values must be same as used in esp_lcd for initial settings of the screen */
+#if LVGL_VERSION_MAJOR >= 9
+        .color_format = LV_COLOR_FORMAT_RGB565,
+#endif
         .rotation = {
             .swap_xy = false,
             .mirror_x = true,
@@ -190,6 +195,9 @@ static esp_err_t app_lvgl_init(void)
         },
         .flags = {
             .buff_dma = true,
+#if LVGL_VERSION_MAJOR >= 9
+            .swap_bytes = true,
+#endif
         }
     };
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
@@ -206,10 +214,10 @@ static esp_err_t app_lvgl_init(void)
 
 static void _app_button_cb(lv_event_t *e)
 {
-    lv_disp_rot_t rotation = lv_disp_get_rotation(lvgl_disp);
+    lv_disp_rotation_t rotation = lv_disp_get_rotation(lvgl_disp);
     rotation++;
-    if (rotation > LV_DISP_ROT_270) {
-        rotation = LV_DISP_ROT_NONE;
+    if (rotation > LV_DISPLAY_ROTATION_270) {
+        rotation = LV_DISPLAY_ROTATION_0;
     }
 
     /* LCD HW rotation */
@@ -225,13 +233,22 @@ static void app_main_display(void)
 
     /* Your LVGL objects code here .... */
 
+    /* Create image */
+    lv_obj_t *img_logo = lv_img_create(scr);
+    lv_img_set_src(img_logo, &esp_logo);
+    lv_obj_align(img_logo, LV_ALIGN_TOP_MID, 0, 20);
+
     /* Label */
     lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_recolor(label, true);
     lv_obj_set_width(label, EXAMPLE_LCD_H_RES);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+#if LVGL_VERSION_MAJOR == 8
+    lv_label_set_recolor(label, true);
     lv_label_set_text(label, "#FF0000 "LV_SYMBOL_BELL" Hello world Espressif and LVGL "LV_SYMBOL_BELL"#\n#FF9400 "LV_SYMBOL_WARNING" For simplier initialization, use BSP "LV_SYMBOL_WARNING" #");
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, -30);
+#else
+    lv_label_set_text(label, LV_SYMBOL_BELL" Hello world Espressif and LVGL "LV_SYMBOL_BELL"\n "LV_SYMBOL_WARNING" For simplier initialization, use BSP "LV_SYMBOL_WARNING);
+#endif
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 20);
 
     /* Button */
     lv_obj_t *btn = lv_btn_create(scr);
