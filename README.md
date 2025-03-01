@@ -5,6 +5,8 @@ This is a template ESP-IDF project for LilyGO [T-Display S3](https://github.com/
 
 This code follows a similar structure to the code provided in [esp-bsp](https://github.com/espressif/esp-bsp) repo.
 
+For the previous version of the code (LVGL 8.3.x & IDF 5.3.x), click [here](https://github.com/hiruna/esp-idf-t-display-s3/tree/idf_5.3.x_lvgl_8.3.x).
+
 ## Tested Hardware & Software Framework(s)
 * LilyGO T-Display S3 [v1.2] (non-touch)
   * ESP-IDF Version 5.5.x ([master branch](https://github.com/espressif/esp-idf))
