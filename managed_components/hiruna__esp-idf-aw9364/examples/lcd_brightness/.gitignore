@@ -1,0 +1,5 @@
+/build/
+/cmake-build-debug**/
+/main/cmake-build-debug**/
+.idea
+/sdkconfig.old

@@ -1,0 +1,7 @@
+description: AW9364 C Driver for ESP-IDF
+url: https://github.com/hiruna/esp-idf-aw9364
+repository: https://github.com/hiruna/esp-idf-aw9364.git
+documentation: https://github.com/hiruna/esp-idf-aw9364
+issues: https://github.com/hiruna/esp-idf-aw9364/issues
+examples:
+  - path: ./examples

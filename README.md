@@ -5,10 +5,15 @@ This is a template ESP-IDF project for LilyGO [T-Display S3](https://github.com/
 
 This code follows a similar structure to the code provided in [esp-bsp](https://github.com/espressif/esp-bsp) repo.
 
+For the previous version of the code (LVGL 8.3.x & IDF 5.3.x), click [here](https://github.com/hiruna/esp-idf-t-display-s3/tree/idf_5.3.x_lvgl_8.3.x).
+
 ## Tested Hardware & Software Framework(s)
 * LilyGO T-Display S3 [v1.2] (non-touch)
-  * ESP-IDF Version 5.3.x ([master branch](https://github.com/espressif/esp-idf))
-  * LVGL 8.3.x
+  * ESP-IDF Version 5.5.x ([master branch](https://github.com/espressif/esp-idf))
+  * LVGL 9.2.x
+
+### Note on LVGL 9
+LVGL demos were conflicting with the lvgl port task, see comments in `ui_lvgl_demos_task` func for my workaround.
 
 ## Capabilities
 
@@ -16,7 +21,7 @@ This project demonstrates the following capabilities:
 
 * Configure the ST7789 display using the I80 Bus
   * Screen orientation is landscape where the buttons are facing towards the left
-* Screen brightness control using LEDC driver
+* Screen brightness control using [hiruna/esp-idf-aw9364](https://github.com/hiruna/esp-idf-aw9364.git)
   * 16-step brightness control
     * NOTE: according to the LilyGO [T-Display S3 Datasheet](https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/schematic/T_Display_S3.pdf), the board is equipped with a [AW9364DNR Dimming LED Driver](https://datasheet.lcsc.com/lcsc/1912111437_AWINIC-Shanghai-Awinic-Tech-AW9364DNR_C401007.pdf)
       capable of 16-step brightness control.
@@ -31,7 +36,7 @@ This project demonstrates the following capabilities:
 
 There are some sdkconfig options that needs to be set, I've included these in a [sdkconfig.defaults](./sdkconfig.defaults) file.
   * I haven't done anything fancy with the partition table, I'm simply using one of the default `PARTITION_TABLE_SINGLE_APP_LARGE`.
-  * You can easily benchmark/stress test the display by setting `CONFIG_LV_USE_DEMO_BENCHMARK` or `CONFIG_LV_USE_DEMO_STRESS` options.
+  * You can easily benchmark/stress test the display by setting `CONFIG_LV_USE_DEMO_BENCHMARK` (also requires `CONFIG_LV_USE_DEMO_WIDGETS`) or `CONFIG_LV_USE_DEMO_STRESS` options.
   * LVGL FPS/CPU Usage overlay can be disabled with `CONFIG_LV_USE_PERF_MONITOR=n`.
 
 ## Notes on LVGL and Memory Management

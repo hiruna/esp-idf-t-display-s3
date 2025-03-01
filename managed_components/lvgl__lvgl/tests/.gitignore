@@ -1,2 +1,4 @@
 *.out
 *_Runner.c
+*.bin
+*_err.png

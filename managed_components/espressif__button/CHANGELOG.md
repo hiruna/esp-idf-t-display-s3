@@ -1,5 +1,90 @@
 # ChangeLog
 
+## v4.0.0 - 2025-1-9
+
+### Enhancements:
+
+* Use the factory pattern to reduce the build size.
+* Change the state machine to use enumerated values.
+
+### Break change:
+
+* Standardize the return value of the iot_button interface to esp_err_t.
+* Remove support for the old ADC driver.
+* Modify the callback registration interface to:
+    ```c
+    esp_err_t iot_button_register_cb(button_handle_t btn_handle, button_event_t event, button_event_args_t *event_args, button_cb_t cb, void *usr_data);
+    ```
+* Modify the callback unregistration interface to:
+    ```c
+    esp_err_t iot_button_unregister_cb(button_handle_t btn_handle, button_event_t event, button_event_args_t *event_args);
+    ```
+
+## v3.5.0 - 2024-12-27
+
+### Enhancements:
+
+* Add config to disable gpio button internal pull resistor.
+
+## v3.4.1 - 2024-12-6
+
+### Fix:
+
+* Fix the issue where `BUTTON_LONG_PRESS_START` is not triggered when the polling interval exceeds 20ms.
+* Remove the `BUTTON_LONG_PRESS_TOLERANCE_MS` configuration option.
+
+## v3.4.0 - 2024-10-22
+
+### Enhancements:
+
+* Supports a maximum button polling interval of 500ms.
+* Fixed a potential counter overflow issue.
+
+### Break change:
+
+* The return value of `iot_button_get_ticks_time` has been changed from `uint16_t` to `uint32_t`.
+
+## v3.3.2 - 2024-8-28
+
+### Enhancements:
+
+* Support macro CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP in power save mode.
+* Supports retrieving and printing the string corresponding to a button event.
+* Fixed the bug where the event was not assigned to `BUTTON_LONG_PRESS_START` before the `BUTTON_LONG_PRESS_START` event occurred.
+
+## v3.3.1 - 2024-8-8
+
+### Enhancements:
+
+* Add Button Event **BUTTON_PRESS_END**.
+
+## v3.3.0 - 2024-8-7
+
+### Enhancements:
+
+* Add Callback **button_power_save_cb_t** to support enter power save manually.
+* Increase the maximum polling interval supported by the button from 20ms to 50ms.
+
+## v3.2.3 - 2024-7-2
+
+* Fixed the issue where the GPIO button in low-power mode continuously woke up the CPU after being pressed, causing abnormal power consumption.
+
+## v3.2.2 - 2024-6-17
+
+* Fix the compilation error for chips that do not support ADC.
+
+## v3.2.1 - 2024-6-17
+
+### bugfix
+
+- Fixed ignored ADC button tied to GND. thanks `demianzenkov` for the fix.
+
+## v3.2.0 - 2023-11-13
+
+### Enhancements:
+
+* The power consumption of GPIO buttons is lower during light sleep mode.
+
 ## v3.1.3 - 2023-11-13
 
 * Resolved issue 'ADC_ATTEN_DB_11 is deprecated'.

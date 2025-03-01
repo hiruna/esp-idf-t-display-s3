@@ -1,14 +1,17 @@
 set(PRIVREQ esp_timer)
+set(REQ driver)
+set(SRC_FILES "button_gpio.c" "iot_button.c" "button_matrix.c")
 
 if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.0")
     list(APPEND REQ esp_adc)
-else() 
-    list(APPEND REQ esp_adc_cal)
+    if(CONFIG_SOC_ADC_SUPPORTED)
+        list(APPEND SRC_FILES "button_adc.c")
+    endif()
 endif()
 
-idf_component_register(SRCS "button_adc.c" "button_gpio.c" "iot_button.c" "button_matrix.c"
-                        INCLUDE_DIRS include
-                        REQUIRES driver ${REQ}
+idf_component_register(SRCS ${SRC_FILES}
+                        INCLUDE_DIRS include interface
+                        REQUIRES ${REQ}
                         PRIV_REQUIRES ${PRIVREQ})
 
 include(package_manager)
