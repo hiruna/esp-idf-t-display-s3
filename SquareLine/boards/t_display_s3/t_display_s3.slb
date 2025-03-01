@@ -15,7 +15,7 @@
     "color_depth": "16 swapped",
     "lvgl_export_path": false,
     "lvgl_include_path": "lvgl.h",
-    "supported_lvgl_version": "8.3.*",
+    "supported_lvgl_version": "9.2.*",
     "pattern_match_files": "CMakeLists.txt,main/main.c",
     "language":"C",
     "ui_export_path":"./components/ui",
