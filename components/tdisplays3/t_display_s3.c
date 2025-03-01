@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Hiruna Wijesinghe <hiruna.kawinda@gmail.com>
+// SPDX-License-Identifier: MIT
+
 #include "t_display_s3.h"
 #include <stdio.h>
 #include <esp_log.h>
@@ -20,7 +23,7 @@ static adc_cali_handle_t adc_cali_handle;
 static aw9364_dev_handle_t aw9364_dev_hdl;
 
 // initialize the LCD I80 bus
-static void init_lcd_i80_bus(esp_lcd_panel_io_handle_t *io_handle, void *user_ctx) {
+static void init_lcd_i80_bus(esp_lcd_panel_io_handle_t *io_handle) {
     ESP_LOGI(TAG, "Initializing Intel 8080 bus...");
     esp_lcd_i80_bus_handle_t i80_bus = NULL;
     esp_lcd_i80_bus_config_t bus_config = {
@@ -58,7 +61,7 @@ static void init_lcd_i80_bus(esp_lcd_panel_io_handle_t *io_handle, void *user_ct
 //            .flags = {
 //                    .swap_color_bytes = !LV_COLOR_16_SWAP, // Swap can be done in LvGL (default) or DMA
 //            },
-            .user_ctx = user_ctx,
+//            .user_ctx = user_ctx,
             .lcd_cmd_bits = LCD_CMD_BITS,
             .lcd_param_bits = LCD_PARAM_BITS,
     };
@@ -251,7 +254,7 @@ static lv_disp_t *lcd_lvgl_add_disp(esp_lcd_panel_io_handle_t io_handle, esp_lcd
     return lvgl_port_add_disp(&disp_cfg);
 }
 
-void lcd_init(lv_disp_t *disp_drv, lv_disp_t **disp_handle, bool backlight_on) {
+void lcd_init(lv_disp_t **disp_handle, bool backlight_on) {
     /* lvgl_port initialization */
     const lvgl_port_cfg_t lvgl_cfg = {
             .task_priority = LVGL_TASK_PRIORITY,
@@ -273,7 +276,7 @@ void lcd_init(lv_disp_t *disp_drv, lv_disp_t **disp_handle, bool backlight_on) {
 
     /* LCD IO */
     esp_lcd_panel_io_handle_t io_handle = NULL;
-    init_lcd_i80_bus(&io_handle, &disp_drv);
+    init_lcd_i80_bus(&io_handle);
 
     /* LCD driver initialization */
     esp_lcd_panel_handle_t panel_handle = NULL;

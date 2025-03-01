@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Hiruna Wijesinghe <hiruna.kawinda@gmail.com>
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #ifdef __cplusplus
@@ -83,7 +86,7 @@ extern "C" {
 #define LVGL_TASK_PRIORITY     2
 
 
-void lcd_init(lv_disp_t *disp_drv, lv_disp_t **disp_handle, bool backlight_on);
+void lcd_init(lv_disp_t **disp_handle, bool backlight_on);
 
 void lcd_set_brightness_step(uint8_t brightness_step);
 

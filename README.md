@@ -10,6 +10,9 @@ This code follows a similar structure to the code provided in [esp-bsp](https://
   * ESP-IDF Version 5.5.x ([master branch](https://github.com/espressif/esp-idf))
   * LVGL 9.2.x
 
+### Note on LVGL 9
+LVGL demos were conflicting with the lvgl port task, see comments in `ui_lvgl_demos_task` func for my workaround.
+
 ## Capabilities
 
 This project demonstrates the following capabilities:
@@ -31,7 +34,7 @@ This project demonstrates the following capabilities:
 
 There are some sdkconfig options that needs to be set, I've included these in a [sdkconfig.defaults](./sdkconfig.defaults) file.
   * I haven't done anything fancy with the partition table, I'm simply using one of the default `PARTITION_TABLE_SINGLE_APP_LARGE`.
-  * You can easily benchmark/stress test the display by setting `CONFIG_LV_USE_DEMO_BENCHMARK` or `CONFIG_LV_USE_DEMO_STRESS` options.
+  * You can easily benchmark/stress test the display by setting `CONFIG_LV_USE_DEMO_BENCHMARK` (also requires `CONFIG_LV_USE_DEMO_WIDGETS`) or `CONFIG_LV_USE_DEMO_STRESS` options.
   * LVGL FPS/CPU Usage overlay can be disabled with `CONFIG_LV_USE_PERF_MONITOR=n`.
 
 ## Notes on LVGL and Memory Management

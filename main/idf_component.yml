@@ -10,6 +10,9 @@ dependencies:
     # version: 8917b345af1533a2dfe2a67b7420f12a4016f389 # last tested version
 #    version: ">=2.4.4"
     pre_release: true
+  lvgl/lvgl:
+    version: "^9"
+    public: true
   hiruna/esp-idf-aw9364:
      git: https://github.com/hiruna/esp-idf-aw9364.git
      version: main

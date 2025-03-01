@@ -60,6 +60,7 @@ direct_dependencies:
 - espressif/esp_lvgl_port
 - hiruna/esp-idf-aw9364
 - idf
-manifest_hash: 557f168c1a861f43caf2f57fc776f31dd05bfb1c3a4d8a2bdbe9b9c4c3026d5b
+- lvgl/lvgl
+manifest_hash: ed0c65e7fd167325180a029c231fb38fe9e08c0dcfd709d2fd081f793233d6b3
 target: esp32s3
 version: 2.0.0

@@ -1,7 +1,11 @@
+// SPDX-FileCopyrightText: © 2025 Hiruna Wijesinghe <hiruna.kawinda@gmail.com>
+// SPDX-License-Identifier: MIT
+
 #include <stdio.h>
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <math.h>
+#include <esp_task_wdt.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "t_display_s3.h"
@@ -10,9 +14,9 @@
 
 
 #if defined CONFIG_LV_USE_DEMO_BENCHMARK
-#include "lvgl/demos/benchmark/lv_demo_benchmark.h"
+#include "lvgl__lvgl/demos/benchmark/lv_demo_benchmark.h"
 #elif defined CONFIG_LV_USE_DEMO_STRESS
-#include "lvgl/demos/stress/lv_demo_stress.h"
+#include "lvgl__lvgl/demos/stress/lv_demo_stress.h"
 #endif
 
 #define TAG "ESP-IDF-T-Display-S3-Example"
@@ -258,24 +262,84 @@ static void ui_update_task(void *pvParam) {
     // a freeRTOS task should never return ^^^
 }
 
+// increment lvgl timer
+static void lvgl_ticker_timer_cb(void *arg)
+{
+    /* Tell LVGL how many milliseconds have elapsed */
+    lv_tick_inc(LVGL_TICK_PERIOD_MS);
+}
+
+static void ui_lvgl_demos_task(void *pvParam) {
+    // this is a workaround to get the lvgl demos working with esp-idf lvgl port
+    // lvgl demos run in lv timers and so lvgl port locks are not called resulting in errors
+    ESP_LOGI(TAG, "starting ui_lvgl_demos_task");
+
+    // first acquire port lock
+    lvgl_port_lock(0);
+
+    // stop lvgl port (lvgl tick timer)
+    if(lvgl_port_stop() == ESP_OK) {
+        ESP_LOGI(TAG, "lvgl_port_stop ok");
+    } else {
+        ESP_LOGE(TAG, "lvgl_port_stop error!");
+    }
+
+    // since lv ticker is stopped by lvgl_port_stop, we need to create a timer for tick
+    lv_timer_enable(true);
+    const esp_timer_create_args_t lvgl_tick_timer_args = {
+            .callback = &lvgl_ticker_timer_cb,
+            .name = "LVGL tick",
+    };
+    esp_timer_handle_t tick_timer;
+    esp_timer_create(&lvgl_tick_timer_args, &tick_timer);
+    esp_timer_start_periodic(tick_timer, LVGL_TICK_PERIOD_MS * 1000);
+
+
+    // start the lvgl demos
+#if defined CONFIG_LV_USE_DEMO_STRESS
+    // if you specified CONFIG_LV_USE_DEMO_STRESS in sdkconfig, it will run lv_demo_stress
+    lv_demo_stress();
+#elif defined CONFIG_LV_USE_DEMO_BENCHMARK
+    // if you specified CONFIG_LV_USE_DEMO_BENCHMARK in sdkconfig, it will run lv_demo_benchmark
+    lv_demo_benchmark();
+#endif
+
+    // infinite loop that handles the lv_timer_handler api calls
+    // similar logic to lvgl port
+    uint32_t task_delay_ms = 0;
+    for(;;) {
+        lvgl_port_lock(0);
+        if (lv_display_get_default()) {
+            task_delay_ms = lv_timer_handler();
+        } else {
+            task_delay_ms = 1;
+        }
+        if(task_delay_ms == LV_NO_TIMER_READY) {
+            task_delay_ms = LVGL_MAX_SLEEP_MS;
+        }
+        vTaskDelay(pdMS_TO_TICKS(task_delay_ms));
+        lvgl_port_unlock();
+    }
+}
+
 void app_main(void) {
-    // LVGL display driver
-    static lv_display_t *disp_drv;
     // LVGL display handle
-    static lv_disp_t *disp_handle;
+    static lv_display_t *disp_handle;
 
     // initialize the LCD
     // don't turn on backlight yet - demo of gradual brightness increase is shown below
     // otherwise you can set it to true to turn on the backlight at lcd init
-    lcd_init(disp_drv, &disp_handle, false);
+    lcd_init(&disp_handle, false);
 
-#if defined CONFIG_LV_USE_DEMO_BENCHMARK
-    // if you specified CONFIG_LV_USE_DEMO_BENCHMARK in sdkconfig, it will run lv_demo_benchmark
-    lv_demo_benchmark();
-
-#elif defined CONFIG_LV_USE_DEMO_STRESS
-    // if you specified CONFIG_LV_USE_DEMO_STRESS in sdkconfig, it will run lv_demo_stress
-    lv_demo_stress();
+#if defined CONFIG_LV_USE_DEMO_BENCHMARK || defined CONFIG_LV_USE_DEMO_STRESS
+    lcd_set_brightness_step(100);
+    // configure a FreeRTOS task, pinned to the second core (core 0 should be used for hw such as wifi, bt etc)
+    TaskHandle_t lvgl_demo_task_hdl = NULL;
+    xTaskCreatePinnedToCore(ui_lvgl_demos_task, "ui_lvgl_demos_task", 4096 * 2, NULL, 0, &lvgl_demo_task_hdl, 1);
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    for(;;) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
 #else
     // otherwise it will show my example
 
